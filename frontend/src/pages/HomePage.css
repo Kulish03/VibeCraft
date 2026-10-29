@@ -1,0 +1,100 @@
+.home-page-container {
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 3rem;
+}
+
+.student-dashboard-header {
+  background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
+  border-bottom: 1px solid var(--border-color);
+  padding: 2.5rem 1.5rem;
+}
+
+.header-container {
+  max-width: 1380px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2rem;
+}
+
+.welcome-meta {
+  max-width: 700px;
+}
+
+.student-badge {
+  display: inline-block;
+  padding: 0.3rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: #eff6ff;
+  color: var(--accent-cyan);
+  border: 1px solid #bfdbfe;
+  margin-bottom: 0.75rem;
+}
+
+.student-welcome-title {
+  font-size: 2.15rem;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: -0.02em;
+  margin-bottom: 0.5rem;
+}
+
+.student-welcome-subtitle {
+  color: #475569;
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.student-stats-row {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.stat-card {
+  background: #ffffff;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 0.85rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 140px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+}
+
+.stat-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.stat-value {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.stat-value.demo-highlight {
+  color: var(--accent-blue);
+}
+
+.home-workspace-section {
+  width: 100%;
+  margin-top: 0.5rem;
+}
+
+@media (max-width: 900px) {
+  .header-container {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
