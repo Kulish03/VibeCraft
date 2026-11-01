@@ -1,22 +1,16 @@
-import { getMockReview } from './mockReviewEngine.js';
+import { getOpenAiReview } from './openAiProvider.js';
 
 /**
  * Review Service Layer
- * 
- * NOTE FOR NEXT STEP (AI INTEGRATION):
- * This service acts as the isolated abstraction layer between the HTTP controller
- * and the review generation engine. To integrate Google Gemini or OpenAI in the next step,
- * simply implement the AI provider call inside this module without altering the controller,
- * validation middleware, or client response schema.
+ * Uses OpenAI (or other provider) to generate code review.
  */
-
 export async function generateCodeReview({ code, language }) {
-  // Line count and character count calculation
-  const lineCount = code.split('\n').length;
+  // Calculate meta info
+  const lineCount = code.split('\\n').length;
   const codeLength = code.length;
 
-  // Currently returns structured, pedagogical mock feedback
-  const reviewResult = getMockReview(code, language);
+  // Call the AI provider (throws on error)
+  const reviewResult = await getOpenAiReview(code, language);
 
   return {
     review: {
@@ -31,9 +25,10 @@ export async function generateCodeReview({ code, language }) {
       language,
       codeLength,
       lineCount,
-      isMock: true,
-      engine: 'mock-pedagogical-v1',
+      isMock: false,
+      engine: 'openai-gpt-4o-mini',
       reviewedAt: new Date().toISOString()
     }
   };
 }
+

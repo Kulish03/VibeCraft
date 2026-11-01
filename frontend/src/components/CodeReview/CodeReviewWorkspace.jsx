@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import CodeEditor from '../CodeEditor/CodeEditor.jsx';
 import FeedbackView from '../ReviewFeedback/FeedbackView.jsx';
-import { STARTER_CODE, SAMPLE_REVIEWS, generateHeuristicReview } from '../../data/sampleFeedback.js';
+import { STARTER_CODE } from '../../data/sampleFeedback.js';
 import './Workspace.css';
 
 export default function CodeReviewWorkspace({ title, subtitle, showBanner = true }) {
@@ -34,8 +34,11 @@ export default function CodeReviewWorkspace({ title, subtitle, showBanner = true
     setErrorMessage(null);
   };
 
-  // Perform review simulation using sample feedback (No AI API yet!)
-  const handleReviewCode = () => {
+  // Call backend API to get a real AI review
+  const handleReviewCode = async () => {
+    // Prevent duplicate submissions while a request is in progress
+    if (status === 'loading') return;
+
     if (!code.trim()) {
       setStatus('error');
       setErrorMessage('Cannot review empty code. Please type or paste a code snippet first.');
@@ -45,26 +48,36 @@ export default function CodeReviewWorkspace({ title, subtitle, showBanner = true
     setStatus('loading');
     setErrorMessage(null);
 
-    // Simulate review progress and network response
-    setTimeout(() => {
-      try {
-        // If code matches the starter template, provide the hand-crafted review
-        const starter = STARTER_CODE[language]?.trim();
-        const current = code.trim();
+    try {
+      const response = await fetch('/api/review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code, language })
+      });
 
-        if (starter && current === starter) {
-          setReviewResult(SAMPLE_REVIEWS[language]);
-        } else {
-          // Dynamic beginner-friendly heuristic review for custom code
-          const customReview = generateHeuristicReview(code, language);
-          setReviewResult(customReview);
-        }
-        setStatus('success');
-      } catch (err) {
-        setStatus('error');
-        setErrorMessage(err.message || 'Analysis failed. Please try again.');
+      if (!response.ok) {
+        // Backend returned an error status; try to extract JSON error message
+        let errMsg = `Server responded with ${response.status}`;
+        try {
+          const errBody = await response.json();
+          errMsg = errBody.error?.message || errMsg;
+        } catch (_) {}
+        throw new Error(errMsg);
       }
-    }, 1200);
+
+      const data = await response.json();
+      // Expected shape: { success:true, data:{...review...}, meta:{...} }
+      if (data.success) {
+        setReviewResult(data.data);
+        setStatus('success');
+      } else {
+        throw new Error(data.error?.message || 'Unexpected response from server');
+      }
+    } catch (err) {
+      // Network or parsing error
+      setErrorMessage(err.message || 'Failed to communicate with the review service.');
+      setStatus('error');
+    }
   };
 
   return (
