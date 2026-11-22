@@ -1,0 +1,94 @@
+services:
+  # =========================================================
+  # 1. MongoDB Database Container
+  # =========================================================
+  mongodb:
+    image: mongo:7.0
+    container_name: vibecraft-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_DATABASE: ai_code_reviewer
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - vibecraft-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # =========================================================
+  # 2. Express Backend API Container
+  # =========================================================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: vibecraft-backend
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      PORT: 5000
+      NODE_ENV: production
+      MONGODB_URI: mongodb://mongodb:27017/ai_code_reviewer
+      JWT_SECRET: ${JWT_SECRET:-vibecraft_super_secure_production_jwt_secret_2026_qwen}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      CLIENT_URL: ${CLIENT_URL:-http://localhost}
+      # Ollama configuration:
+      # host.docker.internal resolves to the host machine running the Ollama engine
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5-coder:7b}
+      OLLAMA_TIMEOUT_MS: ${OLLAMA_TIMEOUT_MS:-180000}
+    extra_hosts:
+      # Enables container-to-host resolution for local Ollama service across Linux, macOS, and Windows
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - vibecraft-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:5000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  # =========================================================
+  # 3. React Frontend SPA & Nginx Reverse Proxy Container
+  # =========================================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: vibecraft-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "5173:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - vibecraft-network
+
+# =========================================================
+# Persistent Storage Volumes
+# =========================================================
+volumes:
+  mongo-data:
+    name: vibecraft_mongo_data
+    driver: local
+
+# =========================================================
+# Isolated Bridge Network
+# =========================================================
+networks:
+  vibecraft-network:
+    name: vibecraft-network
+    driver: bridge

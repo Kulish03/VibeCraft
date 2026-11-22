@@ -1,0 +1,38 @@
+{
+  "name": "ai-code-reviewer-backend",
+  "version": "1.0.0",
+  "description": "Backend API for AI-Based Code Review Assistant using Express, Mongoose, and JWT",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "test": "node test/api.test.js",
+    "test:jest": "jest --runInBand --detectOpenHandles --forceExit"
+  },
+  "dependencies": {
+    "axios": "^1.21.1",
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "express-rate-limit": "^8.7.5",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.4.1",
+    "morgan": "^1.10.0"
+  },
+  "devDependencies": {
+    "jest": "^30.5.2",
+    "nodemon": "^3.1.3",
+    "supertest": "^7.3.2"
+  },
+  "keywords": [
+    "code-review",
+    "express",
+    "mongodb",
+    "mongoose",
+    "jwt",
+    "ollama"
+  ],
+  "author": "",
+  "license": "ISC"
+}
