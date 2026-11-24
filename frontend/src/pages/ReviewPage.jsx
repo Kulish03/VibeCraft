@@ -20,6 +20,7 @@ import {
   Layers,
   Zap,
   BookOpen,
+  MessageSquareCode,
   ArrowRight,
   Info
 } from 'lucide-react';
