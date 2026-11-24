@@ -31,25 +31,33 @@ class BaseAIProvider {
  * Ollama Local Runtime Provider Implementation
  */
 class OllamaProvider extends BaseAIProvider {
-  constructor() {
+  constructor(options = {}) {
     super('Ollama');
+    this.options = options;
   }
 
   getBaseUrl() {
-    return (process.env.OLLAMA_BASE_URL || 'http://localhost:11434').replace(/\/+$/, '');
+    return (this.options.baseUrl || process.env.OLLAMA_BASE_URL || 'http://localhost:11434').replace(/\/+$/, '');
   }
 
   getModel() {
-    return process.env.OLLAMA_MODEL || 'qwen2.5-coder:7b';
+    return this.options.model || process.env.OLLAMA_MODEL || 'qwen2.5-coder:7b';
   }
 
   getTimeoutMs() {
+    if (typeof this.options.timeoutMs === 'number') {
+      return this.options.timeoutMs;
+    }
     const timeout = parseInt(process.env.OLLAMA_TIMEOUT_MS, 10);
     return isNaN(timeout) ? 120000 : timeout;
   }
 
   getHeaders() {
-    const headers = { 'Content-Type': 'application/json' };
+    const headers = {
+      'Content-Type': 'application/json',
+      'ngrok-skip-browser-warning': 'true',
+      'User-Agent': 'VIBECRAFT-Backend/1.0',
+    };
     const apiKey = process.env.OLLAMA_API_KEY || process.env.OLLAMA_AUTH_TOKEN;
     if (apiKey) {
       headers['Authorization'] = `Bearer ${apiKey.trim()}`;
