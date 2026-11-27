@@ -875,14 +875,245 @@ Respond ONLY with a valid JSON object matching this schema:
   }
 }
 
-let activeProvider = new OllamaProvider();
+/**
+ * OpenAI-Compatible Cloud AI Provider (OpenRouter / Groq / OpenAI)
+ * Enables 24/7 cloud inference without running a local Ollama daemon.
+ */
+class OpenAICompatibleProvider extends OllamaProvider {
+  constructor(options = {}) {
+    super(options);
+    this.name = options.name || 'OpenRouter';
+    this.endpoint = options.endpoint || process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1/chat/completions';
+    this.apiKey = options.apiKey || process.env.OPENROUTER_API_KEY || process.env.GROQ_API_KEY || '';
+    this.model = options.model || process.env.OPENROUTER_MODEL || process.env.GROQ_MODEL || 'qwen/qwen-2.5-coder-32b-instruct:free';
+  }
 
-const getAIProvider = () => activeProvider;
+  getBaseUrl() {
+    return this.endpoint;
+  }
+
+  getModel() {
+    return this.model;
+  }
+
+  getHeaders() {
+    const headers = {
+      'Content-Type': 'application/json',
+      'User-Agent': 'VIBECRAFT-Backend/1.0',
+    };
+    if (this.apiKey) {
+      headers['Authorization'] = `Bearer ${this.apiKey.trim()}`;
+    }
+    // OpenRouter headers
+    headers['HTTP-Referer'] = 'https://vibecraft.vercel.app';
+    headers['X-Title'] = 'VIBECRAFT';
+    return headers;
+  }
+
+  async checkHealth() {
+    return {
+      provider: this.name,
+      online: Boolean(this.apiKey),
+      baseUrl: this.endpoint,
+      activeModel: this.model,
+      mode: 'Cloud 24/7 API',
+    };
+  }
+
+  async generateReview({ programmingLanguage, sourceCode, reviewMode = 'detailed', reviewInstructions = '' }) {
+    if (process.env.OLLAMA_SIMULATE === 'true') {
+      return this.generateSimulatedReview({
+        programmingLanguage,
+        sourceCode,
+        reviewMode,
+        reviewInstructions,
+      });
+    }
+
+    const userPrompt = buildStructuredUserPrompt(
+      programmingLanguage,
+      sourceCode,
+      reviewMode,
+      reviewInstructions
+    );
+
+    try {
+      const response = await axios.post(
+        this.endpoint,
+        {
+          model: this.model,
+          messages: [
+            { role: 'system', content: SYSTEM_PROMPT },
+            { role: 'user', content: userPrompt },
+          ],
+          response_format: { type: 'json_object' },
+          temperature: 0.15,
+        },
+        {
+          timeout: this.getTimeoutMs(),
+          headers: this.getHeaders(),
+        }
+      );
+
+      const content = response.data?.choices?.[0]?.message?.content;
+      if (!content) {
+        const err = new Error(`${this.name} returned an empty response.`);
+        err.statusCode = 502;
+        throw err;
+      }
+
+      let parsed;
+      try {
+        parsed = JSON.parse(content);
+      } catch (parseErr) {
+        const cleaned = content.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+        try {
+          parsed = JSON.parse(cleaned);
+        } catch {
+          const err = new Error(`AI review model response could not be parsed as valid JSON: ${content.slice(0, 150)}`);
+          err.statusCode = 502;
+          throw err;
+        }
+      }
+
+      return this.validateAndNormalizeResponse(parsed);
+    } catch (error) {
+      if (error.response?.data?.error) {
+        const msg = error.response.data.error.message || JSON.stringify(error.response.data.error);
+        const err = new Error(`${this.name} API error: ${msg}`);
+        err.statusCode = error.response.status || 502;
+        throw err;
+      }
+      throw error;
+    }
+  }
+
+  async chatFollowUp({ review, message, chatHistory = [] }) {
+    const systemPrompt = `You are VIBECRAFT Assistant, a senior code review mentor.
+Review context:
+- Overall Score: ${review.overallScore}/100
+- Quality Level: ${review.reviewResult?.overallAssessment?.qualityLevel}
+- Bugs detected: ${(review.reviewResult?.bugsAndErrors || []).map((b) => b.title).join(', ') || 'None'}
+- Security flags: ${review.reviewResult?.securityAnalysis?.sqlInjection !== 'None identified' ? 'SQL Injection risk' : 'None'}
+
+Rules:
+1. Be concise, technical, and educational.
+2. If asked how to fix an issue, provide clear code snippets with explanations.
+3. Keep answers focused on teaching the developer how to diagnose and fix the code themselves.`;
+
+    const messages = [{ role: 'system', content: systemPrompt }];
+    chatHistory.slice(-6).forEach((m) => {
+      messages.push({
+        role: m.role === 'assistant' ? 'assistant' : 'user',
+        content: m.content,
+      });
+    });
+    messages.push({ role: 'user', content: message });
+
+    try {
+      const response = await axios.post(
+        this.endpoint,
+        {
+          model: this.model,
+          messages,
+          temperature: 0.3,
+        },
+        {
+          timeout: this.getTimeoutMs(),
+          headers: this.getHeaders(),
+        }
+      );
+
+      const content = response.data?.choices?.[0]?.message?.content;
+      if (!content) throw new Error(`${this.name} returned empty response.`);
+      return { reply: content.trim() };
+    } catch (error) {
+      if (error.response?.data?.error) {
+        const msg = error.response.data.error.message || JSON.stringify(error.response.data.error);
+        const err = new Error(`${this.name} API error: ${msg}`);
+        err.statusCode = error.response.status || 502;
+        throw err;
+      }
+      throw error;
+    }
+  }
+
+  async compareReviews({ originalCode, revisedCode, originalReview, programmingLanguage }) {
+    const comparePrompt = `Analyze the evolution between these two code revisions in ${programmingLanguage}:
+ORIGINAL CODE:
+${originalCode}
+REVISED CODE:
+${revisedCode}
+Return JSON strictly conforming to the requested schema.`;
+
+    try {
+      const response = await axios.post(
+        this.endpoint,
+        {
+          model: this.model,
+          messages: [
+            { role: 'system', content: 'You are an expert code comparison auditor. Respond only in valid JSON.' },
+            { role: 'user', content: comparePrompt },
+          ],
+          response_format: { type: 'json_object' },
+          temperature: 0.15,
+        },
+        {
+          timeout: this.getTimeoutMs(),
+          headers: this.getHeaders(),
+        }
+      );
+
+      const content = response.data?.choices?.[0]?.message?.content;
+      if (!content) throw new Error(`${this.name} returned empty response for comparison.`);
+      const parsed = JSON.parse(content.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim());
+      return parsed;
+    } catch (error) {
+      if (error.response?.data?.error) {
+        const msg = error.response.data.error.message || JSON.stringify(error.response.data.error);
+        const err = new Error(`${this.name} API error: ${msg}`);
+        err.statusCode = error.response.status || 502;
+        throw err;
+      }
+      throw error;
+    }
+  }
+}
+
+function resolveActiveProvider() {
+  if (process.env.OPENROUTER_API_KEY) {
+    return new OpenAICompatibleProvider({
+      name: 'OpenRouter',
+      endpoint: process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1/chat/completions',
+      apiKey: process.env.OPENROUTER_API_KEY,
+      model: process.env.OPENROUTER_MODEL || 'qwen/qwen-2.5-coder-32b-instruct:free',
+    });
+  }
+  if (process.env.GROQ_API_KEY) {
+    return new OpenAICompatibleProvider({
+      name: 'Groq',
+      endpoint: 'https://api.groq.com/openai/v1/chat/completions',
+      apiKey: process.env.GROQ_API_KEY,
+      model: process.env.GROQ_MODEL || 'qwen-2.5-coder-32b',
+    });
+  }
+  return new OllamaProvider();
+}
+
+let activeProvider = resolveActiveProvider();
+
+const getAIProvider = () => {
+  if (activeProvider.name === 'Ollama' && (process.env.OPENROUTER_API_KEY || process.env.GROQ_API_KEY)) {
+    activeProvider = resolveActiveProvider();
+  }
+  return activeProvider;
+};
 const setAIProvider = (providerInstance) => { activeProvider = providerInstance; };
 
 module.exports = {
   BaseAIProvider,
   OllamaProvider,
+  OpenAICompatibleProvider,
   getAIProvider,
   setAIProvider,
 };
