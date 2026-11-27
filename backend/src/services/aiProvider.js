@@ -885,7 +885,7 @@ class OpenAICompatibleProvider extends OllamaProvider {
     this.name = options.name || 'OpenRouter';
     this.endpoint = options.endpoint || process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1/chat/completions';
     this.apiKey = options.apiKey || process.env.OPENROUTER_API_KEY || process.env.GROQ_API_KEY || '';
-    this.model = options.model || process.env.OPENROUTER_MODEL || process.env.GROQ_MODEL || 'qwen/qwen-2.5-coder-32b-instruct:free';
+    this.model = options.model || process.env.OPENROUTER_MODEL || process.env.GROQ_MODEL || 'openrouter/free';
   }
 
   getBaseUrl() {
@@ -1086,7 +1086,7 @@ function resolveActiveProvider() {
       name: 'OpenRouter',
       endpoint: process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1/chat/completions',
       apiKey: process.env.OPENROUTER_API_KEY,
-      model: process.env.OPENROUTER_MODEL || 'qwen/qwen-2.5-coder-32b-instruct:free',
+      model: process.env.OPENROUTER_MODEL || 'openrouter/free',
     });
   }
   if (process.env.GROQ_API_KEY) {
